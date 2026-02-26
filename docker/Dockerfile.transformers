@@ -1,0 +1,6 @@
+FROM vllm/vllm-openai:nightly
+
+RUN apt-get update -y \
+    && apt-get install -y git
+RUN pip install git+https://github.com/huggingface/transformers.git
+RUN pip install qwen-vl-utils==0.0.14
