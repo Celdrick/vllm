@@ -9,11 +9,14 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    outputs:
+      synced: ${{ steps.check-sync.outputs.synced }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Configure git
         run: |
@@ -28,11 +31,43 @@ jobs:
         run: |
           git fetch upstream
 
-      - name: Merge upstream main
+      - name: Check for changes
+        id: check-sync
         run: |
           git checkout main
+          LOCAL=$(git rev-parse HEAD)
+          UPSTREAM=$(git rev-parse upstream/main)
+          if [ "$LOCAL" != "$UPSTREAM" ]; then
+            echo "synced=true" >> $GITHUB_OUTPUT
+            echo "Changes detected: local=$LOCAL, upstream=$UPSTREAM"
+          else
+            echo "synced=false" >> $GITHUB_OUTPUT
+            echo "No changes to sync"
+          fi
+
+      - name: Merge upstream main
+        if: steps.check-sync.outputs.synced == 'true'
+        run: |
           git merge upstream/main --no-edit
 
       - name: Push changes
+        if: steps.check-sync.outputs.synced == 'true'
         run: |
           git push origin main
+
+  trigger-docker-build:
+    needs: sync
+    if: needs.sync.outputs.synced == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Docker Build
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'docker-build.yml',
+              ref: 'main'
+            });
+            console.log('Docker build workflow triggered successfully');
