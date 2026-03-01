@@ -802,6 +802,11 @@ RUN --mount=type=cache,target=/root/.cache/uv \
             rm -rf /var/lib/apt/lists/* \
         ); \
     fi
+    
+RUN apt-get update -y \
+    && apt-get install -y git
+RUN pip install git+https://github.com/huggingface/transformers.git
+RUN pip install qwen-vl-utils==0.0.14
 
 ENV VLLM_USAGE_SOURCE production-docker-image
 
